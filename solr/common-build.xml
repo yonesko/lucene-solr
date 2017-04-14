@@ -73,6 +73,7 @@
   	<fileset dir="${common-solr.dir}/example/lib" excludes="${common.classpath.excludes}"/>
   	<fileset dir="${common-solr.dir}/example/example-DIH/solr/db/lib" excludes="${common.classpath.excludes}"/>  	
   	<fileset dir="lib" excludes="${common.classpath.excludes}" erroronmissingdir="false"/>
+  	<fileset dir="shit" excludes="${common.classpath.excludes}" erroronmissingdir="false"/>
   </path>
 
   <path id="solr.lucene.libs">
