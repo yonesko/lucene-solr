@@ -13,7 +13,7 @@ public class StopWordsFilterFactory extends HybrisStopWordsFilterFactory {
 
     @Override
     protected File getDataFile(SolrResourceLoader loader, String filename) {
-        String dir = loader.getInstanceDir();
+        String dir = loader.getConfigDir();
         return dir == null ? null : new File(dir + File.separator + "ydata" + File.separator + filename + this.langCode + ".txt");
 
     }
