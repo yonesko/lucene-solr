@@ -451,7 +451,7 @@
     <sequential>
       <subant target="@{target}" failonerror="@{failonerror}" inheritall="false">
         <propertyset refid="uptodate.and.compiled.properties"/>
-        <fileset dir="." includes="contrib/*/build.xml"/>
+        <fileset dir="." includes="contrib/komus/build.xml"/>
       </subant>
     </sequential>
   </macrodef>

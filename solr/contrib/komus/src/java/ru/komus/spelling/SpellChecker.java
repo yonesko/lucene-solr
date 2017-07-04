@@ -7,6 +7,7 @@ import org.apache.solr.spelling.AbstractLuceneSpellChecker;
 import org.apache.solr.spelling.IndexBasedSpellChecker;
 import org.apache.solr.spelling.SpellingOptions;
 import org.apache.solr.spelling.SpellingResult;
+import ru.komus.util.LayoutSwitcher;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -25,6 +26,7 @@ public class SpellChecker extends IndexBasedSpellChecker {
         for (Token token : options.tokens) {
             String tokenText = new String(token.buffer(), 0, token.length());
             term = new Term(field, tokenText);
+            Term switchedTerm = new Term(field, LayoutSwitcher.doSwitch(tokenText));
             int docFreq = 0;
             if (reader != null) {
                 docFreq = reader.docFreq(term);
@@ -33,6 +35,14 @@ public class SpellChecker extends IndexBasedSpellChecker {
                     ((options.alternativeTermCount == null || docFreq == 0) ? count
                             : options.alternativeTermCount), field != null ? reader : null, // workaround LUCENE-1295
                     field, options.suggestMode, theAccuracy);
+            String[] suggestionsOfSwitched = spellChecker.suggestSimilar(switchedTerm.text(),
+                    ((options.alternativeTermCount == null || docFreq == 0) ? count
+                            : options.alternativeTermCount), field != null ? reader : null, // workaround LUCENE-1295
+                    field, options.suggestMode, theAccuracy);
+
+            if (suggestions.length == 0)
+                suggestions = suggestionsOfSwitched;
+
             if (suggestions.length == 1 && suggestions[0].equals(tokenText)
                     && options.alternativeTermCount == null) {
                 // These are spelled the same, continue on
@@ -59,8 +69,7 @@ public class SpellChecker extends IndexBasedSpellChecker {
             if (options.extendedResults == true && reader != null && field != null) {
                 result.addFrequency(token, docFreq);
                 int countLimit = Math.min(options.count, suggestions.length);
-                if(countLimit>0)
-                {
+                if (countLimit > 0) {
                     for (int i = 0; i < countLimit; i++) {
                         term = new Term(field, suggestions[i]);
                         result.add(token, suggestions[i], reader.docFreq(term));
