@@ -35,13 +35,17 @@ public class SpellChecker extends IndexBasedSpellChecker {
                     ((options.alternativeTermCount == null || docFreq == 0) ? count
                             : options.alternativeTermCount), field != null ? reader : null, // workaround LUCENE-1295
                     field, options.suggestMode, theAccuracy);
-            String[] suggestionsOfSwitched = spellChecker.suggestSimilar(switchedTerm.text(),
-                    ((options.alternativeTermCount == null || docFreq == 0) ? count
-                            : options.alternativeTermCount), field != null ? reader : null, // workaround LUCENE-1295
-                    field, options.suggestMode, theAccuracy);
-
-            if (suggestions.length == 0)
-                suggestions = suggestionsOfSwitched;
+            //fallback in other keyboard layout
+            if (!switchedTerm.text().contentEquals(tokenText) && suggestions.length == 0) {
+                if (reader != null && reader.docFreq(switchedTerm) > 0) {
+                    suggestions = new String[]{switchedTerm.text()};
+                } else {
+                    suggestions = spellChecker.suggestSimilar(switchedTerm.text(),
+                            ((options.alternativeTermCount == null || docFreq == 0) ? count
+                                    : options.alternativeTermCount), field != null ? reader : null, // workaround LUCENE-1295
+                            field, options.suggestMode, theAccuracy);
+                }
+            }
 
             if (suggestions.length == 1 && suggestions[0].equals(tokenText)
                     && options.alternativeTermCount == null) {
