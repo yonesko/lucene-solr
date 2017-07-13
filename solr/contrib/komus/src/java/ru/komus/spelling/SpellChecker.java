@@ -325,6 +325,7 @@ public class SpellChecker implements java.io.Closeable {
                                    String field, SuggestMode suggestMode, float accuracy) throws IOException {
         // obtainSearcher calls ensureOpen
         final IndexSearcher indexSearcher = obtainSearcher();
+        final String switchedWord = LayoutSwitcher.doSwitch(word);
         try {
             if (ir == null || field == null) {
                 suggestMode = SuggestMode.SUGGEST_ALWAYS;
@@ -337,13 +338,18 @@ public class SpellChecker implements java.io.Closeable {
             final int lengthWord = word.length();
 
             final int freq = (ir != null && field != null) ? ir.docFreq(new Term(field, word)) : 0;
+            final int switchedFreq = (ir != null && field != null) ? ir.docFreq(new Term(field, switchedWord)) : 0;
             final int goalFreq = suggestMode == SuggestMode.SUGGEST_MORE_POPULAR ? freq : 0;
             // if the word exists in the real index and we don't care for word frequency, return the word itself
             if (suggestMode == SuggestMode.SUGGEST_WHEN_NOT_IN_INDEX && freq > 0) {
+                if (switchedFreq > 0) {
+                    return new String[]{word, switchedWord};
+                }
                 return new String[]{word};
             }
 
             BooleanQuery query = new BooleanQuery();
+            BooleanQuery querySw = new BooleanQuery();
             String[] grams;
             String key;
 
@@ -359,14 +365,16 @@ public class SpellChecker implements java.io.Closeable {
 
                 if (bStart > 0) { // should we boost prefixes?
                     add(query, "start" + ng, grams[0], bStart); // matches start of word
-
+                    add(querySw, "start" + ng, LayoutSwitcher.doSwitch(grams[0]), bStart); // matches start of word
                 }
                 if (bEnd > 0) { // should we boost suffixes
                     add(query, "end" + ng, grams[grams.length - 1], bEnd); // matches end of word
+                    add(querySw, "end" + ng, LayoutSwitcher.doSwitch(grams[grams.length - 1]), bEnd); // matches end of word
 
                 }
                 for (int i = 0; i < grams.length; i++) {
                     add(query, key, grams[i]);
+                    add(querySw, key, LayoutSwitcher.doSwitch(grams[i]));
                 }
             }
 
@@ -374,6 +382,7 @@ public class SpellChecker implements java.io.Closeable {
 
             //    System.out.println("Q: " + query);
             ScoreDoc[] hits = indexSearcher.search(query, null, maxHits).scoreDocs;
+            ScoreDoc[] hitsSw = indexSearcher.search(querySw, null, maxHits).scoreDocs;
             //    System.out.println("HITS: " + hits.length());
             SuggestWordQueue sugQueue = new SuggestWordQueue(numSug, comparator);
 
@@ -410,13 +419,39 @@ public class SpellChecker implements java.io.Closeable {
                 sugWord = new SuggestWord();
             }
 
+            stop = Math.min(hitsSw.length, maxHits);
+            sugWord = new SuggestWord();
+            for (int i = 0; i < stop; i++) {
+
+                sugWord.string = indexSearcher.doc(hitsSw[i].doc).get(F_WORD); // get orig word
+
+//                // don't suggest a word for itself, that would be silly
+//                if (sugWord.string.equals(word)) {
+//                    continue;
+//                }
+
+                // edit distance
+                sugWord.score = sd.getDistance(switchedWord, sugWord.string);
+                if (sugWord.score < accuracy) {
+                    continue;
+                }
+
+                sugQueue.insertWithOverflow(sugWord);
+                if (sugQueue.size() == numSug) {
+                    // if queue full, maintain the minScore score
+                    accuracy = sugQueue.top().score;
+                }
+                sugWord = new SuggestWord();
+            }
+
             // convert to array string
             String[] list = new String[sugQueue.size()];
             for (int i = sugQueue.size() - 1; i >= 0; i--) {
                 list[i] = sugQueue.pop().string;
             }
 
-            return list;
+
+            return list.length == 0 ? new String[]{switchedWord} : list;
         } finally {
             releaseSearcher(indexSearcher);
         }
