@@ -338,15 +338,17 @@ public class SpellChecker implements java.io.Closeable {
             final int lengthWord = word.length();
 
             final int freq = (ir != null && field != null) ? ir.docFreq(new Term(field, word)) : 0;
-            final int switchedFreq = (ir != null && field != null) ? ir.docFreq(new Term(field, switchedWord)) : 0;
+            final int freqSw = (ir != null && field != null) ? ir.docFreq(new Term(field, switchedWord)) : 0;
             final int goalFreq = suggestMode == SuggestMode.SUGGEST_MORE_POPULAR ? freq : 0;
             // if the word exists in the real index and we don't care for word frequency, return the word itself
-            if (suggestMode == SuggestMode.SUGGEST_WHEN_NOT_IN_INDEX && freq > 0) {
-                if (switchedFreq > 0) {
-                    return new String[]{word, switchedWord};
-                }
-                return new String[]{word};
-            }
+            if (suggestMode == SuggestMode.SUGGEST_WHEN_NOT_IN_INDEX)
+                if (freq > 0)
+                    if (freqSw > 0)
+                        return new String[]{word, switchedWord};
+                    else
+                        return new String[]{word};
+                else if (freqSw > 0)
+                    return new String[]{switchedWord};
 
             BooleanQuery query = new BooleanQuery();
             BooleanQuery querySw = new BooleanQuery();
@@ -425,11 +427,6 @@ public class SpellChecker implements java.io.Closeable {
 
                 sugWord.string = indexSearcher.doc(hitsSw[i].doc).get(F_WORD); // get orig word
 
-//                // don't suggest a word for itself, that would be silly
-//                if (sugWord.string.equals(word)) {
-//                    continue;
-//                }
-
                 // edit distance
                 sugWord.score = sd.getDistance(switchedWord, sugWord.string);
                 if (sugWord.score < accuracy) {
@@ -450,8 +447,7 @@ public class SpellChecker implements java.io.Closeable {
                 list[i] = sugQueue.pop().string;
             }
 
-
-            return list.length == 0 ? new String[]{switchedWord} : list;
+            return list;
         } finally {
             releaseSearcher(indexSearcher);
         }
