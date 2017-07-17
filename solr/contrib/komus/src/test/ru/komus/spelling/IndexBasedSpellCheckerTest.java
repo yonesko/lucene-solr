@@ -37,6 +37,7 @@ import org.apache.solr.spelling.SpellingOptions;
 import org.apache.solr.spelling.SpellingResult;
 import org.apache.solr.util.RefCounted;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -45,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
+import java.util.Scanner;
 
 import static ru.komus.util.LayoutSwitcher.doSwitch;
 
@@ -68,12 +70,15 @@ public class IndexBasedSpellCheckerTest extends SolrTestCaseJ4 {
 
     @BeforeClass
     public static void beforeClass() throws Exception {
-        initCore("solrconfig.xml", "schema.xml");
+        initCore("komus-solrconfig.xml", "komus-schema.xml");
         core = h.getCore();
         //Index something with a title
-        for (int i = 0; i < DOCS.length; i++) {
-            assertNull(h.validateUpdate(adoc("id", String.valueOf(i), "title", DOCS[i])));
-        }
+        Scanner sc = new Scanner(IndexBasedSpellCheckerTest.class.getResourceAsStream("/name_text_ru.txt"));
+        int i = 0;
+        while (sc.hasNext())
+            assertNull(h.validateUpdate(adoc("id", String.valueOf(i++), "spellcheck_ru", sc.next())));
+        for (String doc : DOCS)
+            assertNull(h.validateUpdate(adoc("id", String.valueOf(i++), "spellcheck_ru", doc)));
         assertNull(h.validateUpdate(commit()));
 
         NamedList<Object> spellchecker = new NamedList();
@@ -82,7 +87,7 @@ public class IndexBasedSpellCheckerTest extends SolrTestCaseJ4 {
         File indexDir = new File(TEMP_DIR, "spellingIdx" + new Date().getTime());
         assertTrue(indexDir.mkdirs());
         spellchecker.add(org.apache.solr.spelling.AbstractLuceneSpellChecker.INDEX_DIR, indexDir.getAbsolutePath());
-        spellchecker.add(org.apache.solr.spelling.AbstractLuceneSpellChecker.FIELD, "title");
+        spellchecker.add(org.apache.solr.spelling.AbstractLuceneSpellChecker.FIELD, "spellcheck_ru");
         spellchecker.add(org.apache.solr.spelling.AbstractLuceneSpellChecker.SPELLCHECKER_ARG_NAME, spellchecker);
 
         String dictName = checker.init(spellchecker, core);
@@ -96,9 +101,9 @@ public class IndexBasedSpellCheckerTest extends SolrTestCaseJ4 {
     }
 
     @Test
-    public void layout() throws Exception {
+    public void layoutAndTypo() throws Exception {
         try {
-            SpellingOptions spellOpts = new SpellingOptions(getTokens(doSwitch("document"), checker.getQueryAnalyzer()), reader);
+            SpellingOptions spellOpts = new SpellingOptions(getTokens(doSwitch("карандашей"), checker.getQueryAnalyzer()), reader);
             SpellingResult result = checker.getSuggestions(spellOpts);
 
             assertTrue("result is null and it shouldn't be", result != null);
@@ -106,7 +111,19 @@ public class IndexBasedSpellCheckerTest extends SolrTestCaseJ4 {
             assertTrue("documemt is null and it shouldn't be", suggestions != null);
             assertTrue("documemt Size: " + suggestions.size() + " is not: " + 1, suggestions.size() == 1);
             Map.Entry<String, Integer> entry = suggestions.entrySet().iterator().next();
-            assertTrue(entry.getKey() + " is not equal to " + "document", entry.getKey().equals("document"));
+            assertTrue(entry.getKey() + " is not equal to " + "document", entry.getKey().equals("карандашей"));
+            assertTrue(entry.getValue() + " does not equal: " + SpellingResult.NO_FREQUENCY_INFO, entry.getValue() == SpellingResult.NO_FREQUENCY_INFO);
+
+
+            spellOpts = new SpellingOptions(getTokens(doSwitch("Colotech"), checker.getQueryAnalyzer()), reader);
+            result = checker.getSuggestions(spellOpts);
+
+            assertTrue("result is null and it shouldn't be", result != null);
+            suggestions = result.get(spellOpts.tokens.iterator().next());
+            assertTrue("documemt is null and it shouldn't be", suggestions != null);
+            assertTrue("documemt Size: " + suggestions.size() + " is not: " + 1, suggestions.size() == 1);
+            entry = suggestions.entrySet().iterator().next();
+            assertTrue(entry.getKey() + " is not equal to " + "Colotech", entry.getKey().equalsIgnoreCase("Colotech"));
             assertTrue(entry.getValue() + " does not equal: " + SpellingResult.NO_FREQUENCY_INFO, entry.getValue() == SpellingResult.NO_FREQUENCY_INFO);
         } finally {
             holder.decref();
@@ -126,7 +143,7 @@ public class IndexBasedSpellCheckerTest extends SolrTestCaseJ4 {
             assertTrue("documemt is null and it shouldn't be", suggestions != null);
             assertTrue("documemt Size: " + suggestions.size() + " is not: " + 1, suggestions.size() == 1);
             Map.Entry<String, Integer> entry = suggestions.entrySet().iterator().next();
-            assertTrue(entry.getKey() + " is not equal to " + "document", entry.getKey().equals("document") == true);
+            assertTrue(entry.getKey() + " is not equal to " + "document", entry.getKey().equals("document"));
             assertTrue(entry.getValue() + " does not equal: " + SpellingResult.NO_FREQUENCY_INFO, entry.getValue() == SpellingResult.NO_FREQUENCY_INFO);
 
             //test something not in the spell checker
@@ -159,11 +176,11 @@ public class IndexBasedSpellCheckerTest extends SolrTestCaseJ4 {
             assertNotNull(suggestions);
             assertTrue("suggestions Size: " + suggestions.size() + " is not: " + 2, suggestions.size() == 2);
             entry = suggestions.entrySet().iterator().next();
-            assertTrue(entry.getKey() + " is equal to " + "bug and it shouldn't be", entry.getKey().equals("bug") == false);
+            assertTrue(entry.getKey() + " is equal to " + "bug and it shouldn't be", !entry.getKey().equals("bug"));
             assertTrue(entry.getValue() + " does not equal: " + SpellingResult.NO_FREQUENCY_INFO, entry.getValue() == SpellingResult.NO_FREQUENCY_INFO);
 
             entry = suggestions.entrySet().iterator().next();
-            assertTrue(entry.getKey() + " is equal to " + "bug and it shouldn't be", entry.getKey().equals("bug") == false);
+            assertTrue(entry.getKey() + " is equal to " + "bug and it shouldn't be", !entry.getKey().equals("bug"));
             assertTrue(entry.getValue() + " does not equal: " + SpellingResult.NO_FREQUENCY_INFO, entry.getValue() == SpellingResult.NO_FREQUENCY_INFO);
         } finally {
             holder.decref();
