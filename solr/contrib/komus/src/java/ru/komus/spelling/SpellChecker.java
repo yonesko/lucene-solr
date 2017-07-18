@@ -325,7 +325,7 @@ public class SpellChecker implements java.io.Closeable {
                                    String field, SuggestMode suggestMode, float accuracy) throws IOException {
         // obtainSearcher calls ensureOpen
         final IndexSearcher indexSearcher = obtainSearcher();
-        final String switchedWord = LayoutSwitcher.doSwitch(word);
+        final String switchedWord = LayoutSwitcher.doSwitch(word).toLowerCase();
         try {
             if (ir == null || field == null) {
                 suggestMode = SuggestMode.SUGGEST_ALWAYS;
